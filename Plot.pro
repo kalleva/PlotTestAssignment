@@ -12,7 +12,6 @@ SOURCES += \
     fileparser.cpp \
     main.cpp \
     plotmatrix.cpp \
-    point.cpp \
     widget.cpp
 
 HEADERS += \

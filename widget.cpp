@@ -6,7 +6,6 @@
 #include "plotmatrix.h"
 #include "ui_widget.h"
 
-#define TOP_OFFSET 75
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
@@ -24,6 +23,10 @@ Widget::Widget(QWidget *parent)
 
     painter = new QPainter(this);
 
+    /* Fills canvas with zeroes initially. */
+    matrix = std::vector<std::vector<int>>(PLOT_MATRIX_FULL_WIDTH,
+                                           std::vector<int>(PLOT_MATRIX_FULL_HEIGHT, 0));
+
     connect(loadFileButton, &QPushButton::released, this, &Widget::handleLoadFileButton);
 }
 
@@ -37,32 +40,42 @@ void Widget::handleLoadFileButton(void)
         fileLabel->setText(file + path);
     }
 
-    /* 2. Call parser on selected file */
-
-    FileParserResultStatus result = Widget::parser.parseLogFile(path.toStdString());
+    /* 2. Call parser on selected file parsedLogEntries will contain  */
+    std::vector<LogEntry> parsedLogEntries;
+    FileParserResultStatus result = Widget::parser.parseLogFile(path.toStdString(),
+                                                                parsedLogEntries);
 
     /* 3. Get results if parsing was successfull */
-
     if (result == FILE_PARSER_RESULT_STATUS_FAILED_TO_OPEN_FILE) {
         QMessageBox msgBox;
         msgBox.setText("No such file: " + path);
         msgBox.exec();
         /* Nothing to do anymore return */
         return;
+    } else if (result == FILE_PARSER_RESULT_STATUS_BAD_FILE) {
+        /* TODO: Currently function parseLogFile doesn't return this status */
+        return;
     }
 
-    std::vector<LogEntry> parsedLogEntries = Widget::parser.getParsedLogEntries();
+    /* 4. Clear current matrix */
+    /* Fill canvas with zeroes before updatin it with new values */
+    for (auto &i : matrix)
+        std::fill(i.begin(), i.end(), 0);
 
-    /* 4. Send results to the matrix */
-    Widget::plotmatrix.updatePlotMatrixWithLogEntries(parsedLogEntries);
+    /* 5. Update matrix with new entries */
+    Widget::plotmatrix.updatePlotMatrixWithLogEntries(parsedLogEntries,
+                                                      matrix,
+                                                      PLOT_MATRIX_WIDTH,
+                                                      PLOT_MATRIX_HIGHT,
+                                                      PLOT_MATRIX_PLOTTING_MARGIN);
 }
 
 void Widget::paintEvent(QPaintEvent *event)
 {
-    drawMatrix(plotmatrix.getPlotMatrix());
+    drawMatrix();
 }
 
-void Widget::drawMatrix(std::vector<std::vector<int>> matrix)
+void Widget::drawMatrix(void)
 {
     painter->begin(this);
     for (int i = 0; i < PLOT_MATRIX_FULL_WIDTH; i++) {
@@ -75,7 +88,7 @@ void Widget::drawMatrix(std::vector<std::vector<int>> matrix)
                 painter->setPen(color);
             }
             /* Painter is upside down, so flip while drawing */
-            painter->drawPoint(i, PLOT_MATRIX_FULL_HEIGHT - 1 - j + TOP_OFFSET);
+            painter->drawPoint(i, PLOT_MATRIX_FULL_HEIGHT - 1 - j + PLOT_TOP_OFFSET);
         }
     }
 

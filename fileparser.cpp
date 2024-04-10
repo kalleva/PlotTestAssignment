@@ -4,16 +4,11 @@
 
 FileParser::FileParser() {}
 
-std::vector<LogEntry> FileParser::getParsedLogEntries(void)
-{
-    return parsedLogEntries;
-}
+/* parsedLogEntries contain valid data ontly if FILE_PARSER_RESULT_STATUS_OK */
+FileParserResultStatus FileParser::parseLogFile(std::string filename,
+                                                std::vector<LogEntry> &parsedLogEntries)
 
-FileParserResultStatus FileParser::parseLogFile(std::string filename)
 {
-    /* Remove old entries */
-    parsedLogEntries.clear();
-
     std::ifstream infile(filename);
 
     if (!infile.is_open()) {
@@ -34,10 +29,10 @@ FileParserResultStatus FileParser::parseLogFile(std::string filename)
             continue;
         }
         if (std::sscanf(line, "%f %f", &timestamp, &value) == 2) {
-            LogEntry p;
-            p.timestamp = timestamp;
-            p.value = value;
-            parsedLogEntries.push_back(p);
+            LogEntry e;
+            e.timestamp = timestamp;
+            e.value = value;
+            parsedLogEntries.push_back(e);
         } else {
             /* TODO: Some error correction */
             /* Skips over empty line */

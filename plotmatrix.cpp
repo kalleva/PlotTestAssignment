@@ -6,25 +6,27 @@
 
 PlotMatrix::PlotMatrix()
 {
-    /* Fills canvas with zeroes initially. */
-    matrix = std::vector<std::vector<int>>(PLOT_MATRIX_FULL_WIDTH,
-                                           std::vector<int>(PLOT_MATRIX_FULL_HEIGHT, 0));
 }
 
-std::vector<std::vector<int>> PlotMatrix::getPlotMatrix()
-{
-    return matrix;
-}
-
-void PlotMatrix::updatePlotMatrixWithLogEntries(std::vector<LogEntry> parsedLogEntries)
+void PlotMatrix::updatePlotMatrixWithLogEntries(std::vector<LogEntry> &parsedLogEntries,
+                                                std::vector<std::vector<int>> &matrix,
+                                                std::size_t matrixWidth,
+                                                std::size_t matrixHeight,
+                                                std::size_t matrixPlottingMargin)
 {
     /* 1. Transform input data to points on the matrix */
-    std::vector<Point> p = tranformLogEntriesToPoints(parsedLogEntries);
+    std::vector<Point> p = tranformLogEntriesToPoints(parsedLogEntries,
+                                                      matrixWidth,
+                                                      matrixHeight,
+                                                      matrixPlottingMargin);
     /* 2. Plot the points */
-    plotPoints(p);
+    plotPoints(p, matrix);
 }
 
-std::vector<Point> PlotMatrix::tranformLogEntriesToPoints(std::vector<LogEntry> logEntries)
+std::vector<Point> PlotMatrix::tranformLogEntriesToPoints(std::vector<LogEntry> &logEntries,
+                                                          std::size_t matrixWidth,
+                                                          std::size_t matrixHeight,
+                                                          std::size_t matrixPlottingMargin)
 {
     /* 1. Find min and max timestamp and value in logEntries */
 
@@ -50,8 +52,8 @@ std::vector<Point> PlotMatrix::tranformLogEntriesToPoints(std::vector<LogEntry> 
     /* 2. Compute range of one matrix cell for timestapms and values from logEntries. 
      * Range for timestamps is based on PLOT_MATRIX_WIDTH. 
      * Range for values is based on PLOT_MATRIX_HIGHT. */
-    double timestampCellRange = (maxTimestamp - minTimestamp) / PLOT_MATRIX_WIDTH;
-    double valueCellRange = (maxValue - minValue) / PLOT_MATRIX_HIGHT;
+    double timestampCellRange = (maxTimestamp - minTimestamp) / matrixWidth;
+    double valueCellRange = (maxValue - minValue) / matrixHeight;
 
     /* 3. Go through the logEntries and for each entry compute point.
      * Some points will be the same, so filter them out with set*/
@@ -61,10 +63,9 @@ std::vector<Point> PlotMatrix::tranformLogEntriesToPoints(std::vector<LogEntry> 
     double timestampZeroAjustment = int(minTimestamp / timestampCellRange);
     double valueZeroAjustment = int(minValue / valueCellRange);
     for (LogEntry entry : logEntries) {
-        /* x integer less then PLOT_MATRIX_WIDTH, y integer less then PLOT_MATRIX_HIGHT. */
-        int x = PLOT_MATRIX_MARGIN + int(entry.timestamp / timestampCellRange)
+        int x = matrixPlottingMargin + int(entry.timestamp / timestampCellRange)
                 - timestampZeroAjustment;
-        int y = PLOT_MATRIX_MARGIN + int(entry.value / valueCellRange) - valueZeroAjustment;
+        int y = matrixPlottingMargin + int(entry.value / valueCellRange) - valueZeroAjustment;
         Point p(x, y);
 
         /* Only insert in result vector if this is the new Point */
@@ -77,7 +78,7 @@ std::vector<Point> PlotMatrix::tranformLogEntriesToPoints(std::vector<LogEntry> 
     return vp;
 }
 
-void PlotMatrix::putDot(int x, int y)
+void PlotMatrix::putDot(int x, int y, std::vector<std::vector<int>> &matrix)
 {
     /* Shape of the dot
      *    ###
@@ -110,10 +111,11 @@ void PlotMatrix::putDot(int x, int y)
     matrix[x + 1][y - 2] = 1;
 }
 
-void PlotMatrix::putBresenhamLine(int x0, int y0, int x1, int y1)
+void PlotMatrix::putBresenhamLine(
+    int x0, int y0, int x1, int y1, std::vector<std::vector<int>> &matrix)
 {
     /* https://gist.github.com/bert/1085538#file-plot_line-c
-     * Works when x1 > x0 which is alway the case in timeseries
+     * Works when x1 > x0 which is alway the case in these timeseries
      * When x1 == x0 I call verticalLine for performance
      * This function works ok with 1000 lines.
      * The plot width is less than 1000 so it's ok */
@@ -138,7 +140,7 @@ void PlotMatrix::putBresenhamLine(int x0, int y0, int x1, int y1)
     }
 }
 
-void PlotMatrix::putVerticalLine(int x, int y0, int y1)
+void PlotMatrix::putVerticalLine(int x, int y0, int y1, std::vector<std::vector<int>> &matrix)
 {
     if (y0 > y1) {
         std::swap(y0, y1);
@@ -148,23 +150,12 @@ void PlotMatrix::putVerticalLine(int x, int y0, int y1)
     }
 }
 
-void PlotMatrix::plotPoints(std::vector<Point> points)
+void PlotMatrix::plotPoints(std::vector<Point> points, std::vector<std::vector<int>> &matrix)
 {
-    /* Fill canvas with zeroes before working with it. */
-    for (auto &i : matrix)
-        std::fill(i.begin(), i.end(), 0);
-
-    // matrix.resize(PLOT_MATRIX_FULL_WIDTH, std::vector<int>(PLOT_MATRIX_FULL_HEIGHT, 0));
-    // for (size_t i = 0; i < PLOT_MATRIX_FULL_WIDTH; i++) {
-    //     for (size_t j = 0; j < PLOT_MATRIX_FULL_HEIGHT; j++) {
-    //         matrix[i][j] = 0;
-    //     }
-    // }
-
     /* Print first point */
-    putDot(points[0].x, points[0].y);
+    putDot(points[0].x, points[0].y, matrix);
     for (size_t i = 1; i < points.size(); i++) {
-        putDot(points[i].x, points[i].y);
+        putDot(points[i].x, points[i].y, matrix);
 
         /* Find if line should be drawn or points are connecting */
         /* Dumb way to check is just to check if squares in the center
@@ -184,10 +175,10 @@ void PlotMatrix::plotPoints(std::vector<Point> points)
               && (abs(points[i].y - points[i - 1].y) <= 3))) {
             /* Find if vertical line should be drawn */
             if (points[i].x == points[i - 1].x) {
-                putVerticalLine(points[i].x, points[i - 1].y, points[i].y);
+                putVerticalLine(points[i].x, points[i - 1].y, points[i].y, matrix);
             } else {
                 /* Bresenham line should be drawn */
-                putBresenhamLine(points[i - 1].x, points[i - 1].y, points[i].x, points[i].y);
+                putBresenhamLine(points[i - 1].x, points[i - 1].y, points[i].x, points[i].y, matrix);
             }
         }
     }
