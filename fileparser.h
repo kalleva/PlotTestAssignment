@@ -16,7 +16,7 @@ class FileParser
 public:
     FileParser();
     std::vector<LogEntry> getParsedLogEntries(void);
-    FileParserResultStatus parseLogFile(std::string filename,
+    FileParserResultStatus parseLogFile(const std::string &filename,
                                         std::vector<LogEntry> &parsedLogEntries);
 };
 

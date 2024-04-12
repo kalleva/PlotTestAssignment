@@ -5,7 +5,7 @@
 FileParser::FileParser() {}
 
 /* parsedLogEntries contain valid data ontly if FILE_PARSER_RESULT_STATUS_OK */
-FileParserResultStatus FileParser::parseLogFile(std::string filename,
+FileParserResultStatus FileParser::parseLogFile(const std::string &filename,
                                                 std::vector<LogEntry> &parsedLogEntries)
 
 {
@@ -19,16 +19,16 @@ FileParserResultStatus FileParser::parseLogFile(std::string filename,
     /* On largest file on my laptop sscanf parsing was ~1.5s.
      * Time can be improved with some parsing library */
 
-    float timestamp, value;
-    char line[256]; /* Seems enough for all files provided */
+    double timestamp, value;
+    std::string line;
 
-    while (infile.getline(line, sizeof(line))) {
+    while (std::getline(infile, line)) {
         /* TODO: Ask if I shoud actually do something with this data */
         /* Skip lines starting with */
         if (line[0] == '#') {
             continue;
         }
-        if (std::sscanf(line, "%f %f", &timestamp, &value) == 2) {
+        if (std::sscanf(line.c_str(), "%lf %lf", &timestamp, &value) == 2) {
             LogEntry e;
             e.timestamp = timestamp;
             e.value = value;
